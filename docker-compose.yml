@@ -1,0 +1,36 @@
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb_recruitable_chat
+    hostname: mongodb_recruitable_chat
+    restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=recruitable_user
+      - MONGO_INITDB_ROOT_PASSWORD=recruitable_dev@af!
+      - MONGO_INITDB_DATABASE=recruitable_chat
+      - TZ=Asia/Kathmandu
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_chat_data:/data/db
+      - mongodb_chat_config:/data/configdb
+    networks:
+      - elastic
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mongodb_chat_data:
+    driver: local
+  mongodb_chat_config:
+    driver: local
+
+networks:
+  elastic:
+    driver: bridge
+
