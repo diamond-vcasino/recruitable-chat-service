@@ -27,7 +27,7 @@ spring:
     property-naming-strategy: SNAKE_CASE
 
   rabbitmq:
-    host: redis_recruitable
+    host: rabbitmq-recruitable
     port: 5672
     username: recruitable_user
     password: recruitable_dev@af!
