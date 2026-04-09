@@ -8,7 +8,7 @@ spring:
       database: recruitable_chat
       auto-index-creation: true
     redis:
-      host: redis-recruitable
+      host: localhost
       port: 6379
       timeout: 2000ms
 
@@ -27,7 +27,7 @@ spring:
     property-naming-strategy: SNAKE_CASE
 
   rabbitmq:
-    host: rabbitmq-recruitable
+    host: localhost
     port: 5672
     username: recruitable_user
     password: recruitable_dev@af!

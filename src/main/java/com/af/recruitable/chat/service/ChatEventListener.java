@@ -35,7 +35,7 @@ public class ChatEventListener {
             }
 
             messagingTemplate.convertAndSend(destination, payload);
-            log.debug("Relayed RabbitMQ event to WS: dest={}", destination);
+            log.info("⬅ Relayed RabbitMQ event → WS clients: dest={}", destination);
         } catch (Exception e) {
             log.error("Error processing RabbitMQ chat event: {}", e.getMessage(), e);
         }

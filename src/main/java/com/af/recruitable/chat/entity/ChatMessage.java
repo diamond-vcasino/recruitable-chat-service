@@ -46,8 +46,14 @@ public class ChatMessage {
     @Builder.Default
     private boolean deleted = false;
 
+    /**
+     * Explicitly defaulted to Instant.now() so the timestamp is ALWAYS present
+     * even if Spring Data MongoDB auditing is not active in the current environment.
+     * @CreatedDate will honour the pre-set value and will not override it.
+     */
+    @Builder.Default
     @CreatedDate
-    private Instant createdAt;
+    private Instant createdAt = Instant.now();
 
     private Instant editedAt;
 }

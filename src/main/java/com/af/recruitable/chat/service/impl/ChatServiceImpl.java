@@ -204,6 +204,7 @@ public class ChatServiceImpl implements ChatService {
                 .fileName(normalizeOptional(request.getFileName()))
                 .fileSize(request.getFileSize())
                 .fileContentType(normalizeOptional(request.getFileContentType()))
+                .createdAt(Instant.now())   // Always set explicitly — do not rely solely on @CreatedDate auditing
                 .build();
 
         message = messageRepository.save(message);
@@ -411,6 +412,9 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private ChatMessageResponse toMessageResponse(ChatMessage msg) {
+        // Fallback to Instant.EPOCH for legacy messages that have no createdAt stored
+        // in MongoDB (prevents null-pointer crashes in frontend sort/display code).
+        Instant createdAt = msg.getCreatedAt() != null ? msg.getCreatedAt() : Instant.EPOCH;
         return ChatMessageResponse.builder()
                 .id(UUID.fromString(msg.getId()))
                 .roomId(UUID.fromString(msg.getRoomId()))
@@ -424,7 +428,7 @@ public class ChatServiceImpl implements ChatService {
                 .fileContentType(msg.getFileContentType())
                 .edited(msg.isEdited())
                 .deleted(msg.isDeleted())
-                .createdAt(msg.getCreatedAt())
+                .createdAt(createdAt)
                 .editedAt(msg.getEditedAt())
                 .build();
     }

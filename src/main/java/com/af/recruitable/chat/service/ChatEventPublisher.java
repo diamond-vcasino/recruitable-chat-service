@@ -38,7 +38,7 @@ public class ChatEventPublisher {
                     "payload", payload
             );
             rabbitTemplate.convertAndSend(exchange, routingKey, envelope);
-            log.debug("Published to RabbitMQ: dest={}", destination);
+            log.info("➡ Published to RabbitMQ [exchange={}, key={}]: dest={}", exchange, routingKey, destination);
         } catch (Exception e) {
             log.error("Failed to publish to RabbitMQ: dest={}, error={}", destination, e.getMessage(), e);
         }
