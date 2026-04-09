@@ -4,11 +4,11 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb://recruitable_user:recruitable_dev%40af!@localhost:27017/recruitable_chat?authSource=admin
+      uri: mongodb://recruitable_user:recruitable_dev%40af!@mongodb_recruitable_chat:27017/recruitable_chat?authSource=admin
       database: recruitable_chat
       auto-index-creation: true
     redis:
-      host: localhost
+      host: redis-recruitable
       port: 6379
       timeout: 2000ms
 
@@ -27,7 +27,7 @@ spring:
     property-naming-strategy: SNAKE_CASE
 
   rabbitmq:
-    host: localhost
+    host: redis_recruitable
     port: 5672
     username: recruitable_user
     password: recruitable_dev@af!
