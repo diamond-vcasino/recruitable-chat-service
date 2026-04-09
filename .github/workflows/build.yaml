@@ -128,7 +128,7 @@ jobs:
           generate-summary: true
 
       - name: Upload test results
-        if: always()
+        if: false
         uses: actions/upload-artifact@v4
         with:
           name: test-results
@@ -139,7 +139,7 @@ jobs:
           retention-days: 7
 
       - name: Upload JaCoCo coverage report
-        if: success() && hashFiles('target/site/jacoco/index.html') != ''
+        if: false
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
@@ -147,7 +147,7 @@ jobs:
           retention-days: 7
 
       - name: Upload JAR
-        if: success()
+        if: false
         uses: actions/upload-artifact@v4
         with:
           name: app-jar
