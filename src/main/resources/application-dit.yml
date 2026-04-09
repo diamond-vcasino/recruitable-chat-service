@@ -1,0 +1,83 @@
+spring:
+  application:
+    name: recruitable-chat-service
+
+  data:
+    mongodb:
+      uri: mongodb://recruitable_user:recruitable_dev%40af!@localhost:27017/recruitable_chat?authSource=admin
+      database: recruitable_chat
+      auto-index-creation: true
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+  # ── Exclude JPA / Flyway / DataSource auto-config from parent ──
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    property-naming-strategy: SNAKE_CASE
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: recruitable_user
+    password: recruitable_dev@af!
+    virtual-host: /
+
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 20MB
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:your-secret-key-change-in-production-minimum-32-characters-long}
+    issuer: recruitable-api
+    audience: recruitable-client
+    clockSkewSeconds: 300
+
+  websocket:
+    broker-relay-enabled: false
+    stomp-relay-port: 61613
+
+  rabbitmq:
+    exchange: chat.exchange
+    queue: chat.events
+    routing-key: chat.broadcast
+
+  s3:
+    endpoint: ${S3_ENDPOINT:https://s3.cloud.ideeza.com}
+    bucket-name: ${S3_BUCKET_NAME:recruitable-storage1}
+    access-key-id: ${S3_ACCESS_KEY_ID:168e00da83e64591a366685de30a2fbe}
+    secret-access-key: ${S3_SECRET_ACCESS_KEY:dda2f5bcded945769eef013981a0565b}
+    region: ${S3_REGION:us-east-1}
+    path-style-access-enabled: true
+    download-url-expiry-minutes: 15
+
+springdoc:
+  swagger-ui:
+    tags-sorter: alpha
+    operations-sorter: alpha
+    doc-expansion: none
+    display-request-duration: true
