@@ -1,9 +1,11 @@
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\ChatServiceApplication.java
+C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\config\ChatWebSocketErrorHandler.java
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\config\RabbitConfig.java
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\config\S3Config.java
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\config\SecurityConfig.java
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\config\WebSocketAuthInterceptor.java
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\config\WebSocketConfig.java
+C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\config\WebSocketErrorHandlerConfigurer.java
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\config\WebSocketEventListener.java
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\constant\DeliveryStatus.java
 C:\Users\ACER\Documents\project\springboot\recruitable\recruitable-chat-service\src\main\java\com\af\recruitable\chat\constant\MemberRole.java

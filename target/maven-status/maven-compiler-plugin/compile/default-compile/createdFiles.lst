@@ -31,6 +31,7 @@ com\af\recruitable\chat\dto\TypingEvent.class
 com\af\recruitable\chat\security\JwtProperties.class
 com\af\recruitable\chat\service\ChatEventPublisher.class
 com\af\recruitable\chat\service\impl\PresenceServiceImpl.class
+com\af\recruitable\chat\config\ChatWebSocketErrorHandler.class
 com\af\recruitable\chat\dto\ChatMessageResponse$ChatMessageResponseBuilder.class
 com\af\recruitable\chat\repository\ChatMessageRepository.class
 com\af\recruitable\chat\dto\WebSocketEventDto$WebSocketEventDtoBuilder.class
@@ -38,6 +39,7 @@ com\af\recruitable\chat\dto\CreateRoomRequest$CreateRoomRequestBuilder.class
 com\af\recruitable\chat\config\WebSocketEventListener.class
 com\af\recruitable\chat\dto\ChatRoomResponse.class
 com\af\recruitable\chat\dto\WebSocketEventDto.class
+com\af\recruitable\chat\config\WebSocketErrorHandlerConfigurer.class
 com\af\recruitable\chat\constant\MessageType.class
 com\af\recruitable\chat\dto\TypingEvent$TypingEventBuilder.class
 com\af\recruitable\chat\config\WebSocketAuthInterceptor.class
