@@ -4,12 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+
+import java.util.List;
 import java.util.Map;
 @Configuration
 @EnableWebSecurity
@@ -18,6 +22,7 @@ import java.util.Map;
 public class SecurityConfig {
     private final JwtAuthenticationFilter jwtFilter;
     private final ObjectMapper objectMapper;
+    private final AppCorsProperties corsProperties;
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -26,16 +31,20 @@ public class SecurityConfig {
             .formLogin(f -> f.disable())
             .httpBasic(b -> b.disable())
             .cors(c -> c.configurationSource(req -> {
-                var cors = new org.springframework.web.cors.CorsConfiguration();
-                cors.setAllowedOriginPatterns(java.util.List.of("*"));
-                cors.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
-                cors.setAllowedHeaders(java.util.List.of("*"));
+                CorsConfiguration cors = new CorsConfiguration();
+                if (corsProperties.isAllowAllOrigins()) {
+                    cors.setAllowedOriginPatterns(List.of("*"));
+                } else {
+                    cors.setAllowedOrigins(corsProperties.getAllowedOrigins());
+                }
+                cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+                cors.setAllowedHeaders(List.of("*"));
                 cors.setAllowCredentials(true);
-                cors.setMaxAge(3600L);
+                cors.setMaxAge(corsProperties.getMaxAge());
                 return cors;
             }))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/ws/**", "/swagger-ui/**", "/v3/api-docs/**",
                                  "/actuator/**").permitAll()
                 .anyRequest().authenticated()

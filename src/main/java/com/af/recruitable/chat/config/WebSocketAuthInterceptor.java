@@ -198,6 +198,18 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             return token.isEmpty() ? null : token;
         }
         String t = accessor.getFirstNativeHeader("token");
-        return (t != null && !t.isBlank()) ? t.trim() : null;
+        if (t != null && !t.isBlank()) {
+            return t.trim();
+        }
+        String at = accessor.getFirstNativeHeader("rct_at");
+        if (at != null && !at.isBlank()) {
+            return at.trim();
+        }
+        Object fromSession = accessor.getSessionAttributes() != null
+                ? accessor.getSessionAttributes().get(WebSocketHandshakeAuthInterceptor.SESSION_JWT_TOKEN_ATTR)
+                : null;
+        return fromSession instanceof String sessionToken && !sessionToken.isBlank()
+                ? sessionToken.trim()
+                : null;
     }
 }
