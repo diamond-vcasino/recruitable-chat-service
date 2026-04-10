@@ -3,22 +3,20 @@ package com.af.recruitable.chat.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Collection;
 
 /**
  * Validates JWTs issued by the main recruitable-api auth service.
  * <p>
  * The signing key is derived from the shared secret configured via
- * {@code app.jwt.secret}. The key bytes are automatically padded to
- * 64 bytes (512 bits) so that JJWT's {@code Keys.hmacShaKeyFor()}
- * always selects HS512 without a key-size mismatch error.
+ * {@code app.jwt.secret}. We use the raw UTF-8 bytes directly for
+ * compatibility with the auth service signing behavior.
  */
 @Component
 @Slf4j
@@ -50,10 +48,8 @@ public class JwtTokenValidator {
     }
 
     /**
-     * Ensures the raw secret bytes are at least 64 bytes (512 bits) so
-     * {@link Keys#hmacShaKeyFor(byte[])} selects HS512 without error.
-     * If the configured secret is shorter, we zero-pad it (safe for
-     * HMAC – the padding is deterministic and reproducible).
+     * Build an HMAC key from raw secret bytes so verification behavior
+     * matches the token issuer as closely as possible.
      */
     private static SecretKey buildKey(String secret) {
         byte[] raw = secret.getBytes(StandardCharsets.UTF_8);
@@ -63,12 +59,11 @@ public class JwtTokenValidator {
                             + " bits). Minimum 32 bytes (256 bits) required.");
         }
         if (raw.length < 64) {
-            log.warn("JWT secret is {} bytes ({} bits) – padding to 64 bytes (512 bits) for HS512 compatibility. "
-                            + "Consider using a secret that is at least 64 characters long.",
-                    raw.length, raw.length * 8);
-            raw = Arrays.copyOf(raw, 64);          // zero-pads to 64 bytes
+            log.warn("JWT secret is {} bytes ({} bits). HS512 is expected to use 64+ bytes. "
+                    + "Using raw key bytes for compatibility; align auth/chat secrets to 64+ bytes.",
+                raw.length, raw.length * 8);
         }
-        return Keys.hmacShaKeyFor(raw);
+        return new SecretKeySpec(raw, "HmacSHA512");
     }
 
     private void validateAudience(Claims claims) {
