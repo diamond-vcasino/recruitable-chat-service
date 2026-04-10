@@ -27,6 +27,7 @@ com\af\recruitable\chat\dto\PageResponse$PageResponseBuilder.class
 com\af\recruitable\chat\ChatServiceApplication.class
 com\af\recruitable\chat\constant\DeliveryStatus.class
 com\af\recruitable\chat\dto\SendPrivateMessageRequest$SendPrivateMessageRequestBuilder.class
+com\af\recruitable\chat\config\WebSocketHandshakeAuthInterceptor.class
 com\af\recruitable\chat\dto\TypingEvent.class
 com\af\recruitable\chat\security\JwtProperties.class
 com\af\recruitable\chat\service\ChatEventPublisher.class
@@ -43,6 +44,7 @@ com\af\recruitable\chat\config\WebSocketErrorHandlerConfigurer.class
 com\af\recruitable\chat\constant\MessageType.class
 com\af\recruitable\chat\dto\TypingEvent$TypingEventBuilder.class
 com\af\recruitable\chat\config\WebSocketAuthInterceptor.class
+com\af\recruitable\chat\config\AppCorsProperties.class
 com\af\recruitable\chat\entity\ChatMessage.class
 com\af\recruitable\chat\dto\FileUploadResponse.class
 com\af\recruitable\chat\constant\RoomType.class

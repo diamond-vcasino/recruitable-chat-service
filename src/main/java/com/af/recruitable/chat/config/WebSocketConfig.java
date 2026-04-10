@@ -22,7 +22,9 @@ import java.util.List;
 @Slf4j
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final WebSocketAuthInterceptor authInterceptor;
+    private final WebSocketHandshakeAuthInterceptor handshakeAuthInterceptor;
     private final ObjectMapper objectMapper;
+    private final AppCorsProperties corsProperties;
     @Value("${app.websocket.broker-relay-enabled:false}")
     private boolean brokerRelayEnabled;
     @Value("${spring.rabbitmq.host:localhost}")
@@ -35,8 +37,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private String rabbitPass;
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws").setAllowedOriginPatterns("*").withSockJS();
-        registry.addEndpoint("/ws").setAllowedOriginPatterns("*");
+        String[] originPatterns = corsProperties.isAllowAllOrigins()
+                ? new String[]{"*"}
+                : corsProperties.getAllowedOrigins().toArray(String[]::new);
+
+        registry.addEndpoint("/ws")
+                .addInterceptors(handshakeAuthInterceptor)
+                .setAllowedOriginPatterns(originPatterns)
+                .withSockJS();
+        registry.addEndpoint("/ws")
+                .addInterceptors(handshakeAuthInterceptor)
+                .setAllowedOriginPatterns(originPatterns);
         log.info("WebSocket STOMP endpoint registered at /ws");
     }
     @Override

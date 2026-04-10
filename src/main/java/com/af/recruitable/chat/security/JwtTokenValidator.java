@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collection;
 
 /**
  * Validates JWTs issued by the main recruitable-api auth service.
@@ -36,14 +37,16 @@ public class JwtTokenValidator {
     }
 
     public Claims validateToken(String token) throws JwtException {
-        return Jwts.parser()
+        Claims claims = Jwts.parser()
                 .verifyWith(signingKey)
                 .requireIssuer(jwtProperties.getIssuer())
-                .requireAudience(jwtProperties.getAudience())
                 .clockSkewSeconds(jwtProperties.getClockSkewSeconds())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+
+        validateAudience(claims);
+        return claims;
     }
 
     /**
@@ -66,5 +69,22 @@ public class JwtTokenValidator {
             raw = Arrays.copyOf(raw, 64);          // zero-pads to 64 bytes
         }
         return Keys.hmacShaKeyFor(raw);
+    }
+
+    private void validateAudience(Claims claims) {
+        String expectedAudience = jwtProperties.getAudience();
+        if (expectedAudience == null || expectedAudience.isBlank()) {
+            return;
+        }
+
+        Object audClaim = claims.get("aud");
+        if (audClaim instanceof String aud && expectedAudience.equals(aud)) {
+            return;
+        }
+        if (audClaim instanceof Collection<?> collection && collection.stream().anyMatch(expectedAudience::equals)) {
+            return;
+        }
+
+        throw new IllegalArgumentException("Invalid audience");
     }
 }
