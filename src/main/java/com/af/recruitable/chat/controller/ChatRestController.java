@@ -1,6 +1,7 @@
 package com.af.recruitable.chat.controller;
 
 import com.af.recruitable.chat.dto.*;
+import com.af.recruitable.chat.security.OrgMembershipVerifier;
 import com.af.recruitable.chat.security.SecurityUtils;
 import com.af.recruitable.chat.service.ChatEventPublisher;
 import com.af.recruitable.chat.service.ChatService;
@@ -39,6 +40,7 @@ public class ChatRestController {
     private final FileStorageService fileStorageService;
     private final PresenceService presenceService;
     private final ChatEventPublisher eventPublisher;
+    private final OrgMembershipVerifier orgMembershipVerifier;
 
     // ── Rooms ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +77,7 @@ public class ChatRestController {
     public ResponseEntity<ChatRoomResponse> addMember(@PathVariable UUID roomId, @PathVariable UUID userId) {
         UUID requesterId = SecurityUtils.getCurrentUserId();
         UUID orgId = SecurityUtils.getCurrentOrganizationId();
+        orgMembershipVerifier.verifyRoomOrgMembership(roomId, orgId);
         ChatRoomResponse room = chatService.addMember(roomId, userId, requesterId, orgId, SecurityUtils.isCurrentUserAdmin());
         broadcastRoomEvent(orgId, "MEMBER_ADDED", userId, roomId, null);
         eventPublisher.publish(roomMembersTopic(orgId, roomId), WebSocketEventDto.builder()
@@ -91,6 +94,7 @@ public class ChatRestController {
     public ResponseEntity<Void> removeMember(@PathVariable UUID roomId, @PathVariable UUID userId) {
         UUID requesterId = SecurityUtils.getCurrentUserId();
         UUID orgId = SecurityUtils.getCurrentOrganizationId();
+        orgMembershipVerifier.verifyRoomOrgMembership(roomId, orgId);
         chatService.removeMember(roomId, userId, requesterId, orgId, SecurityUtils.isCurrentUserAdmin());
         broadcastRoomEvent(orgId, "MEMBER_REMOVED", userId, roomId, null);
         eventPublisher.publish(roomMembersTopic(orgId, roomId), WebSocketEventDto.builder()
@@ -112,6 +116,7 @@ public class ChatRestController {
             @RequestParam(defaultValue = "50") int size) {
         UUID userId = SecurityUtils.getCurrentUserId();
         UUID orgId = SecurityUtils.getCurrentOrganizationId();
+        orgMembershipVerifier.verifyRoomAccess(roomId, userId, orgId);
         return ResponseEntity.ok(chatService.getMessages(roomId, userId, orgId, page, size));
     }
 
@@ -120,6 +125,7 @@ public class ChatRestController {
     public ResponseEntity<ChatMessageResponse> sendMessage(@PathVariable UUID roomId, @Valid @RequestBody SendMessageRequest request) {
         UUID userId = SecurityUtils.getCurrentUserId();
         UUID orgId = SecurityUtils.getCurrentOrganizationId();
+        orgMembershipVerifier.verifyRoomAccess(roomId, userId, orgId);
         request.setRoomId(roomId);
 
         ChatMessageResponse response = chatService.sendMessage(request, userId, orgId);

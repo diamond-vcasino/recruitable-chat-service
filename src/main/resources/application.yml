@@ -62,7 +62,7 @@ app:
     maxAge: 3600
 
   jwt:
-    secret: ${JWT_SECRET:your-secret-key-change-in-production-minimum-64-characters-long!}
+    secret: ${JWT_SECRET}
     issuer: recruitable-api
     audience: recruitable-client
     clockSkewSeconds: 300
