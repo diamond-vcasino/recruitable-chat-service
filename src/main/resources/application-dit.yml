@@ -52,12 +52,13 @@ management:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:your-secret-key-change-in-production-minimum-32-characters-long}
+    secret: ${JWT_SECRET:your-secret-key-change-in-production-minimum-64-characters-long!}
     issuer: recruitable-api
     audience: recruitable-client
     clockSkewSeconds: 300
 
   websocket:
+    auth-required: ${APP_WEBSOCKET_AUTH_REQUIRED:true}
     broker-relay-enabled: false
     stomp-relay-port: 61613
 

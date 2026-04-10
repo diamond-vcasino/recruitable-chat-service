@@ -29,7 +29,7 @@ spring:
 
 app:
   jwt:
-    secret: test-secret-key-must-be-at-least-32-characters-long-for-hmac
+    secret: test-secret-key-must-be-at-least-64-characters-long-for-hmac-sha512!
     issuer: recruitable-api
     audience: recruitable-client
 

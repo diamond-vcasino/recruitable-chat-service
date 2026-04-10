@@ -7,6 +7,7 @@ import com.af.recruitable.chat.security.JwtTokenValidator;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -30,6 +31,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private final JwtTokenValidator jwtTokenValidator;
     private final ChatRoomRepository roomRepository;
 
+    @Value("${app.websocket.auth-required:true}")
+    private boolean authRequired;
+
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
@@ -47,12 +51,16 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     private void authenticate(StompHeaderAccessor accessor) {
         String token = extractToken(accessor);
+        if ((token == null || token.isBlank()) && !authRequired) {
+            authenticateFromHeaders(accessor);
+            return;
+        }
         if (token == null || token.isBlank()) {
-            log.debug("WS CONNECT rejected: missing or empty Authorization token");
+            log.warn("WS CONNECT rejected: missing or empty Authorization token");
             throw new IllegalArgumentException("Missing or empty Authorization token");
         }
         if (token.chars().filter(c -> c == '.').count() != 2) {
-            log.debug("WS CONNECT rejected: token is not a valid JWT format (length={})", token.length());
+            log.warn("WS CONNECT rejected: token is not a valid JWT format (length={})", token.length());
             throw new IllegalArgumentException("Invalid token format");
         }
 
@@ -86,6 +94,37 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             log.warn("WS CONNECT rejected: {}", e.getMessage());
             throw new IllegalArgumentException("Invalid token: " + e.getMessage());
         }
+    }
+
+    private void authenticateFromHeaders(StompHeaderAccessor accessor) {
+        UUID userId = parseUuidHeader(accessor, "x-user-id", "user-id", "userId");
+        UUID orgId = parseUuidHeader(accessor, "x-org-id", "x-organization-id", "organization-id", "organizationId");
+        if (userId == null || orgId == null) {
+            throw new IllegalArgumentException("Missing required x-user-id/x-org-id headers");
+        }
+        accessor.setUser(new JwtAuthenticationToken(
+                userId,
+                "anonymous",
+                List.of(),
+                "anonymous@chat.local",
+                List.of("MEMBER"),
+                List.of(),
+                orgId));
+        log.info("WS CONNECT authenticated in header mode: user={}, org={}", userId, orgId);
+    }
+
+    private UUID parseUuidHeader(StompHeaderAccessor accessor, String... headerNames) {
+        for (String headerName : headerNames) {
+            String value = accessor.getFirstNativeHeader(headerName);
+            if (value != null && !value.isBlank()) {
+                try {
+                    return UUID.fromString(value.trim());
+                } catch (IllegalArgumentException ignored) {
+                    // try next candidate header name
+                }
+            }
+        }
+        return null;
     }
 
     private void authorizeSubscription(StompHeaderAccessor accessor) {
