@@ -102,7 +102,7 @@ jobs:
       - name: Restart service on server
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "docker compose -f /home/ubuntu/recruiter-services/${{ env.COMPOSE_FILE }} up -d --force-recreate ${{ env.SERVICE }}"
+            "docker compose --env-file /home/ubuntu/recruitable-api-backend/.env -f /home/ubuntu/recruiter-services/${{ env.COMPOSE_FILE }} up -d --force-recreate ${{ env.SERVICE }}"
 
       - name: Clean up SSH key
         if: always()
