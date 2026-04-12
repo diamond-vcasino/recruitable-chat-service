@@ -62,7 +62,8 @@ app:
     maxAge: 3600
 
   jwt:
-    secret: ${JWT_SECRET:your-secret-key-change-in-production-minimum-64-characters-long!}
+    # Keep this identical to api-backend for shared JWT verification.
+    secret: ${JWT_SECRET:replace-this-dev-secret-with-a-unique-64-char-min-value-1234567890}
     issuer: recruitable-api
     audience: recruitable-client
     clockSkewSeconds: 300

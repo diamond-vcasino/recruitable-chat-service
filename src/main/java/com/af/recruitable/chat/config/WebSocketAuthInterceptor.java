@@ -4,6 +4,7 @@ import com.af.recruitable.chat.entity.ChatRoom;
 import com.af.recruitable.chat.repository.ChatRoomRepository;
 import com.af.recruitable.chat.security.JwtAuthenticationToken;
 import com.af.recruitable.chat.security.JwtTokenValidator;
+import com.af.recruitable.chat.security.TokenRevocationService;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private static final String ROOM_MARKER = ".room.";
 
     private final JwtTokenValidator jwtTokenValidator;
+    private final TokenRevocationService tokenRevocationService;
     private final ChatRoomRepository roomRepository;
 
     @Value("${app.websocket.auth-required:true}")
@@ -68,6 +70,10 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             Claims claims = jwtTokenValidator.validateToken(token);
             if (!"access".equals(claims.get("type", String.class))) {
                 throw new IllegalArgumentException("Only access tokens allowed");
+            }
+            // ── Revocation check (shared Redis blacklist with api-backend) ──
+            if (tokenRevocationService.isTokenRevoked(claims)) {
+                throw new IllegalArgumentException("Token has been revoked");
             }
             UUID userId = UUID.fromString(claims.getSubject());
             String email = claims.get("email", String.class);

@@ -20,6 +20,7 @@ import java.util.UUID;
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenValidator jwtTokenValidator;
+    private final TokenRevocationService tokenRevocationService;
     @Override
     protected void doFilterInternal(HttpServletRequest request,
             HttpServletResponse response, FilterChain filterChain)
@@ -30,6 +31,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtTokenValidator.validateToken(token);
                 String tokenType = claims.get("type", String.class);
                 if ("access".equals(tokenType)) {
+                    // ── Revocation check (shared Redis blacklist with api-backend) ──
+                    if (tokenRevocationService.isTokenRevoked(claims)) {
+                        log.warn("Revoked access token used on chat REST: jti={}", claims.getId());
+                        SecurityContextHolder.clearContext();
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
                     UUID userId = UUID.fromString(claims.getSubject());
                     String email = claims.get("email", String.class);
                     String orgIdStr = claims.get("organizationId", String.class);
