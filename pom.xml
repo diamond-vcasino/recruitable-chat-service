@@ -86,6 +86,21 @@
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>
+        <!-- Keep default Spring Boot logging runtime and avoid parent-provided Loki/Logstash appenders in this service. -->
+        <dependency>
+            <groupId>com.github.loki4j</groupId>
+            <artifactId>loki-logback-appender</artifactId>
+            <version>1.5.2</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>8.0</version>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
     <profiles>
         <profile>
@@ -135,6 +150,16 @@
                 <configuration>
                     <mainClass>${spring.boot.main.class}</mainClass>
                     <layout>JAR</layout>
+                    <excludes>
+                        <exclude>
+                            <groupId>com.github.loki4j</groupId>
+                            <artifactId>loki-logback-appender</artifactId>
+                        </exclude>
+                        <exclude>
+                            <groupId>net.logstash.logback</groupId>
+                            <artifactId>logstash-logback-encoder</artifactId>
+                        </exclude>
+                    </excludes>
                 </configuration>
                 <executions>
                     <execution>
