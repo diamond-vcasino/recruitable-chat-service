@@ -12,8 +12,7 @@ import jakarta.validation.constraints.Size;
 @Data
 public class JwtProperties {
     @NotBlank
-    @Size(min = 32, message = "JWT secret must be at least 32 characters (256 bits). "
-            + "For HS512, use 64+ characters (512 bits).")
+    @Size(min = 64, message = "JWT secret must be at least 64 characters (512 bits) for HS512.")
     private String secret;
     private String issuer = "recruitable-api";
     private String audience = "recruitable-client";
