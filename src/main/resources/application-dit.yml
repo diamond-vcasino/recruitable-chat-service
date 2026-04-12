@@ -78,6 +78,9 @@ app:
     queue: chat.events
     routing-key: chat.broadcast
 
+  api-backend:
+    base-url: ${APP_API_BACKEND_BASE_URL:http://recruiter-api:8080}
+
   s3:
     endpoint: ${S3_ENDPOINT:https://s3.cloud.ideeza.com}
     bucket-name: ${S3_BUCKET_NAME:recruitable-storage1}
