@@ -3,10 +3,7 @@ package com.af.recruitable.chat.controller;
 import com.af.recruitable.chat.dto.*;
 import com.af.recruitable.chat.security.OrgMembershipVerifier;
 import com.af.recruitable.chat.security.SecurityUtils;
-import com.af.recruitable.chat.service.ChatEventPublisher;
-import com.af.recruitable.chat.service.ChatService;
-import com.af.recruitable.chat.service.FileStorageService;
-import com.af.recruitable.chat.service.PresenceService;
+import com.af.recruitable.chat.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -41,6 +38,24 @@ public class ChatRestController {
     private final PresenceService presenceService;
     private final ChatEventPublisher eventPublisher;
     private final OrgMembershipVerifier orgMembershipVerifier;
+    private final OrgMemberService orgMemberService;
+
+    // ── Organization Members (for user selection in chat UI) ──────────────────────
+
+    @GetMapping("/org-members")
+    @Operation(summary = "List organization members", description = "List all org members for user selection (DM, group add). Supports search and pagination.")
+    public ResponseEntity<PageResponse<OrgMemberResponse>> listOrgMembers(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        UUID userId = SecurityUtils.getCurrentUserId();
+        UUID orgId = SecurityUtils.getCurrentOrganizationId();
+        String jwtToken = SecurityUtils.getCurrentJwtToken();
+
+        PageResponse<OrgMemberResponse> members = orgMemberService.listOrgMembers(search, page, size, jwtToken, userId);
+        log.info("Listed {} org members for user {}", members.getContent().size(), userId);
+        return ResponseEntity.ok(members);
+    }
 
     // ── Rooms ────────────────────────────────────────────────────────────────────
 

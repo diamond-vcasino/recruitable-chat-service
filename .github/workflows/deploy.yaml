@@ -88,24 +88,6 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Resolve JWT secret
-        run: |
-          JWT_SECRET_VALUE="${{ secrets.JWT_SECRET }}"
-          if [ -z "$JWT_SECRET_VALUE" ]; then
-            JWT_SECRET_VALUE="${{ vars.JWT_SECRET }}"
-          fi
-          if [ -z "$JWT_SECRET_VALUE" ]; then
-            echo "JWT_SECRET is not configured in GitHub secrets or vars" >&2
-            exit 1
-          fi
-          JWT_LEN=$(printf %s "$JWT_SECRET_VALUE" | wc -c | tr -d ' ')
-          if [ "$JWT_LEN" -lt 64 ]; then
-            echo "JWT_SECRET must be at least 64 characters for HS512 (got $JWT_LEN)" >&2
-            exit 1
-          fi
-          echo "::add-mask::$JWT_SECRET_VALUE"
-          echo "JWT_SECRET_VALUE=$JWT_SECRET_VALUE" >> $GITHUB_ENV
-          echo "SHARED_ENV_PATH=/home/ubuntu/recruitable-api-backend/.env" >> $GITHUB_ENV
 
       - name: Copy JAR to server
         run: |
@@ -114,16 +96,13 @@ jobs:
 
       - name: Write .env file on server
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
-            printf 'JWT_SECRET=%s\n' '${{ env.JWT_SECRET_VALUE }}' > '${{ env.SHARED_ENV_PATH }}'
-            chmod 600 '${{ env.SHARED_ENV_PATH }}'
-          EOF
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "printf 'JWT_SECRET=%s\n' '${{ secrets.JWT_SECRET }}' > /home/ubuntu/recruitable-api-backend/.env && chmod 600 /home/ubuntu/recruitable-api-backend/.env"
 
       - name: Restart service on server
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
-            docker compose --env-file '${{ env.SHARED_ENV_PATH }}' -f /home/ubuntu/recruiter-services/${{ env.COMPOSE_FILE }} up -d --force-recreate ${{ env.SERVICE }}
-          EOF
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "docker compose -f /home/ubuntu/recruiter-services/${{ env.COMPOSE_FILE }} up -d --force-recreate ${{ env.SERVICE }}"
 
       - name: Clean up SSH key
         if: always()
