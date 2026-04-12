@@ -62,8 +62,8 @@ app:
     maxAge: 3600
 
   jwt:
-    # Keep this identical to api-backend for shared JWT verification.
-    secret: ${JWT_SECRET:replace-this-dev-secret-with-a-unique-64-char-min-value-1234567890}
+    # DIT must receive JWT_SECRET from environment (same value as api-backend).
+    secret: ${JWT_SECRET}
     issuer: recruitable-api
     audience: recruitable-client
     clockSkewSeconds: 300
