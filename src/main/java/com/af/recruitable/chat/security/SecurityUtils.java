@@ -43,4 +43,12 @@ public class SecurityUtils {
     public boolean isCurrentUserAdmin() {
         return hasCurrentRole("ADMIN");
     }
+
+    public String getCurrentJwtToken() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken token) {
+            return token.getToken();
+        }
+        throw new SecurityException("User is not authenticated");
+    }
 }
