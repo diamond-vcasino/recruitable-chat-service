@@ -2,21 +2,29 @@ package com.af.recruitable.chat.service;
 
 import com.af.recruitable.chat.dto.OrgMemberResponse;
 import com.af.recruitable.chat.dto.PageResponse;
-import com.af.recruitable.chat.security.SecurityUtils;
+import com.af.recruitable.chat.exception.ChatException;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Service to fetch organization members from recruitable-api-backend.
@@ -28,6 +36,7 @@ import java.util.stream.Collectors;
 public class OrgMemberService {
 
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.api-backend.base-url:http://localhost:8080}")
     private String apiBackendUrl;
@@ -44,7 +53,6 @@ public class OrgMemberService {
      */
     public PageResponse<OrgMemberResponse> listOrgMembers(String search, int page, int size, String jwtToken, UUID currentUserId) {
         try {
-            // Build query URL
             UriComponentsBuilder uriBuilder = UriComponentsBuilder
                     .fromUriString(apiBackendUrl)
                     .path("/api/v1/profiles")
@@ -53,123 +61,186 @@ public class OrgMemberService {
                     .queryParam("sortBy", "fullName")
                     .queryParam("sortDirection", "ASC");
 
-            // Search is done client-side post-fetch; API backend would need search param
-            // For now, we fetch all and filter, or you can enhance api-backend with search
-
             String url = uriBuilder.toUriString();
 
-            // Prepare headers with JWT
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(jwtToken);
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            // Call api-backend
             var response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
                     entity,
-                    new ParameterizedTypeReference<ApiResponse<PageResponse<ProfileDto>>>() {}
+                    String.class
             );
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null && response.getBody().getData() != null) {
-                PageResponse<ProfileDto> profilePage = response.getBody().getData();
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new ChatException("Failed to fetch org members from api-backend", HttpStatus.BAD_GATEWAY);
+            }
 
-                // Transform to OrgMemberResponse
-                List<OrgMemberResponse> members = profilePage.getContent().stream()
-                        .map(profile -> OrgMemberResponse.builder()
-                                .userId(profile.getUserId())
-                                .fullName(profile.getFullName())
-                                .email(profile.getEmail())
-                                .avatarUrl(profile.getAvatarUrl())
+            if (response.getBody() == null || response.getBody().isBlank()) {
+                return emptyPage(page, size);
+            }
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+            // api-backend wraps payload under `content`; keep `data` fallback for compatibility.
+            JsonNode pageNode = root.hasNonNull("content")
+                    ? root.get("content")
+                    : (root.hasNonNull("data") ? root.get("data") : root);
+
+            BackendPageResponse<ProfileDto> profilePage = objectMapper.convertValue(
+                    pageNode,
+                    new TypeReference<BackendPageResponse<ProfileDto>>() {}
+            );
+
+            List<ProfileDto> profiles = profilePage.getContent() == null
+                    ? List.of()
+                    : profilePage.getContent();
+
+            String normalizedSearch = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+
+            List<OrgMemberResponse> members = profiles.stream()
+                    .filter(Objects::nonNull)
+                    .map(profile -> {
+                        UUID memberId = profile.getUserId();
+                        String fullName = profile.resolveDisplayName();
+                        String email = profile.getEmail() == null ? "" : profile.getEmail();
+
+                        return OrgMemberResponse.builder()
+                                .userId(memberId)
+                                .fullName(fullName)
+                                .email(email)
+                                .avatarUrl(profile.resolveAvatarUrl())
                                 .role(profile.getRole())
                                 .department(profile.getDepartment())
                                 .status(profile.getStatus())
-                                .isCurrentUser(profile.getUserId().equals(currentUserId))
-                                .build()
-                        )
-                        // Client-side search filter if provided
-                        .filter(member -> search == null || search.isBlank() ||
-                                member.getFullName().toLowerCase().contains(search.toLowerCase()) ||
-                                member.getEmail().toLowerCase().contains(search.toLowerCase()))
-                        .collect(Collectors.toList());
+                                .isCurrentUser(memberId != null && memberId.equals(currentUserId))
+                                .build();
+                    })
+                    .filter(member -> normalizedSearch.isBlank() ||
+                            member.getFullName().toLowerCase(Locale.ROOT).contains(normalizedSearch) ||
+                            member.getEmail().toLowerCase(Locale.ROOT).contains(normalizedSearch))
+                    .toList();
 
-                return PageResponse.<OrgMemberResponse>builder()
-                        .content(members)
-                        .page(profilePage.getPage())
-                        .size(profilePage.getSize())
-                        .totalElements(profilePage.getTotalElements())
-                        .totalPages(profilePage.getTotalPages())
-                        .last(profilePage.isLast())
-                        .build();
-            }
-
-            log.warn("Failed to fetch org members from api-backend: {}", response.getStatusCode());
             return PageResponse.<OrgMemberResponse>builder()
-                    .content(List.of())
-                    .page(page)
-                    .size(size)
-                    .totalElements(0)
-                    .totalPages(0)
-                    .last(true)
+                    .content(members)
+                    .page(Optional.ofNullable(profilePage.getPage()).map(PageMetadata::getPageNumber).orElse(page))
+                    .size(Optional.ofNullable(profilePage.getPage()).map(PageMetadata::getPageSize).orElse(size))
+                    .totalElements(Optional.ofNullable(profilePage.getPage()).map(PageMetadata::getTotalElements).orElse((long) members.size()))
+                    .totalPages(Optional.ofNullable(profilePage.getPage()).map(PageMetadata::getTotalPages).orElse(0))
+                    .first(Optional.ofNullable(profilePage.getPage()).map(m -> m.getPageNumber() <= 0).orElse(page == 0))
+                    .last(Optional.ofNullable(profilePage.getPage()).map(m -> m.getPageNumber() >= Math.max(m.getTotalPages() - 1, 0)).orElse(true))
                     .build();
 
+        } catch (ChatException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error fetching org members from api-backend", e);
-            return PageResponse.<OrgMemberResponse>builder()
-                    .content(List.of())
-                    .page(page)
-                    .size(size)
-                    .totalElements(0)
-                    .totalPages(0)
-                    .last(true)
-                    .build();
+            throw new ChatException("Unable to fetch organization members from user service", HttpStatus.BAD_GATEWAY);
         }
+    }
+
+    private PageResponse<OrgMemberResponse> emptyPage(int page, int size) {
+        return PageResponse.<OrgMemberResponse>builder()
+                .content(List.of())
+                .page(page)
+                .size(size)
+                .totalElements(0)
+                .totalPages(0)
+                .first(page == 0)
+                .last(true)
+                .build();
     }
 
     // ── Internal DTOs (mirrors api-backend, simplified) ───────────────────
 
-    private static class ApiResponse<T> {
-        private boolean success;
-        private String message;
-        private T data;
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class BackendPageResponse<T> {
+        private List<T> content;
+        private PageMetadata page;
 
-        public T getData() {
-            return data;
-        }
+        public List<T> getContent() { return content; }
+        public void setContent(List<T> content) { this.content = content; }
+        public PageMetadata getPage() { return page; }
+        public void setPage(PageMetadata page) { this.page = page; }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class PageMetadata {
+        @JsonProperty("page_number")
+        private int pageNumber;
+        @JsonProperty("page_size")
+        private int pageSize;
+        @JsonProperty("total_elements")
+        private long totalElements;
+        @JsonProperty("total_pages")
+        private int totalPages;
+
+        public int getPageNumber() { return pageNumber; }
+        public void setPageNumber(int pageNumber) { this.pageNumber = pageNumber; }
+        public int getPageSize() { return pageSize; }
+        public void setPageSize(int pageSize) { this.pageSize = pageSize; }
+        public long getTotalElements() { return totalElements; }
+        public void setTotalElements(long totalElements) { this.totalElements = totalElements; }
+        public int getTotalPages() { return totalPages; }
+        public void setTotalPages(int totalPages) { this.totalPages = totalPages; }
+    }
+
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private static class ProfileDto {
         private java.util.UUID userId;
         private String fullName;
+        private String firstName;
+        private String lastName;
         private String email;
         private String avatarUrl;
+        private String profileImageUrl;
         private String role;
         private String department;
         private String status;
 
         public java.util.UUID getUserId() { return userId; }
+        public void setUserId(UUID userId) { this.userId = userId; }
         public String getFullName() { return fullName; }
+        public void setFullName(String fullName) { this.fullName = fullName; }
+        public String getFirstName() { return firstName; }
+        public void setFirstName(String firstName) { this.firstName = firstName; }
+        public String getLastName() { return lastName; }
+        public void setLastName(String lastName) { this.lastName = lastName; }
         public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
         public String getAvatarUrl() { return avatarUrl; }
+        public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+        public String getProfileImageUrl() { return profileImageUrl; }
+        public void setProfileImageUrl(String profileImageUrl) { this.profileImageUrl = profileImageUrl; }
         public String getRole() { return role; }
+        public void setRole(String role) { this.role = role; }
         public String getDepartment() { return department; }
+        public void setDepartment(String department) { this.department = department; }
         public String getStatus() { return status; }
-    }
+        public void setStatus(String status) { this.status = status; }
 
-    public static class PageResponseImpl {
-        private List<?> content;
-        private int page;
-        private int size;
-        private long totalElements;
-        private int totalPages;
-        private boolean last;
+        public String resolveDisplayName() {
+            if (fullName != null && !fullName.isBlank()) {
+                return fullName;
+            }
+            List<String> parts = new ArrayList<>();
+            if (firstName != null && !firstName.isBlank()) {
+                parts.add(firstName.trim());
+            }
+            if (lastName != null && !lastName.isBlank()) {
+                parts.add(lastName.trim());
+            }
+            if (!parts.isEmpty()) {
+                return String.join(" ", parts);
+            }
+            return email != null && !email.isBlank() ? email : "Unknown user";
+        }
 
-        public List<?> getContent() { return content; }
-        public int getPage() { return page; }
-        public int getSize() { return size; }
-        public long getTotalElements() { return totalElements; }
-        public int getTotalPages() { return totalPages; }
-        public boolean isLast() { return last; }
+        public String resolveAvatarUrl() {
+            return avatarUrl != null && !avatarUrl.isBlank() ? avatarUrl : profileImageUrl;
+        }
     }
 }
 
