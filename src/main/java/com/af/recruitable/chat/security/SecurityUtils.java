@@ -51,4 +51,12 @@ public class SecurityUtils {
         }
         throw new SecurityException("User is not authenticated");
     }
+
+    public String getCurrentEmail() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken token) {
+            return token.getEmail();
+        }
+        throw new SecurityException("User is not authenticated");
+    }
 }

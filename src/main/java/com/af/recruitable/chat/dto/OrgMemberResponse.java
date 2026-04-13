@@ -1,5 +1,6 @@
 package com.af.recruitable.chat.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -39,6 +40,7 @@ public class OrgMemberResponse {
     @Schema(description = "Account status", example = "ACTIVE")
     private String status;
 
+    @JsonProperty("is_current_user")
     @Schema(description = "Whether this is the current user (true = exclude from selectable list)", example = "false")
     private boolean isCurrentUser;
 }

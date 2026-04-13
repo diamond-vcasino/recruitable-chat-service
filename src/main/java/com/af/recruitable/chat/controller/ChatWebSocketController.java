@@ -39,6 +39,11 @@ public class ChatWebSocketController {
         UUID senderId = auth.getUserId();
         UUID orgId = auth.getOrganizationId();
 
+        // Auto-resolve sender name from JWT if not provided
+        if (request.getSenderName() == null || request.getSenderName().isBlank()) {
+            request.setSenderName(auth.getEmail() != null ? auth.getEmail() : senderId.toString());
+        }
+
         ChatMessageResponse response = chatService.sendMessage(request, senderId, orgId);
 
         // Broadcast to the room topic via RabbitMQ
