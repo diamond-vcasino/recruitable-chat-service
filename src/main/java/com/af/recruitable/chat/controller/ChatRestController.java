@@ -220,10 +220,14 @@ public class ChatRestController {
     // ── Presence ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/users/online")
-    @Operation(summary = "Get online users", description = "List all online users in the current organization")
-    public ResponseEntity<Set<UUID>> getOnlineUsers() {
+    @Operation(summary = "Get online users", description = "List online users with profile details in the current organization")
+    public ResponseEntity<List<OrgMemberResponse>> getOnlineUsers() {
+        UUID userId = SecurityUtils.getCurrentUserId();
         UUID orgId = SecurityUtils.getCurrentOrganizationId();
-        return ResponseEntity.ok(presenceService.getOnlineUsers(orgId));
+        String jwtToken = SecurityUtils.getCurrentJwtToken();
+        Set<UUID> onlineIds = presenceService.getOnlineUsers(orgId);
+        List<OrgMemberResponse> onlineUsers = orgMemberService.listOrgMembersByIds(onlineIds, jwtToken, userId);
+        return ResponseEntity.ok(onlineUsers);
     }
 
     private void broadcastRoomEvent(UUID orgId, String eventName, UUID actorUserId, UUID roomId, UUID messageId) {

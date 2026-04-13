@@ -85,7 +85,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.AURORA_GITHUB_TOKEN }}
 
       - name: Run tests and generate coverage
-        run: mvn verify -B -Dspring.profiles.active=test
+        run: mvn verify -B -Dspring.profiles.active=test -Pcoverage
         env:
           GITHUB_USERNAME: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.AURORA_GITHUB_TOKEN }}

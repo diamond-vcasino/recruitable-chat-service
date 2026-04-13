@@ -59,6 +59,10 @@ public class ChatWebSocketController {
         UUID orgId = auth.getOrganizationId();
 
         event.setUserId(userId);
+        // Set userName so receivers can display "X is typing..."
+        if (event.getUserName() == null || event.getUserName().isBlank()) {
+            event.setUserName(auth.getEmail() != null ? auth.getEmail() : userId.toString());
+        }
         presenceService.publishTyping(orgId, event.getRoomId(), userId, event.isTyping());
 
         // Broadcast typing event via RabbitMQ
