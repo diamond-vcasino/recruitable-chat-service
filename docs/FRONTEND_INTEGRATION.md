@@ -197,6 +197,10 @@ Returns all accessible rooms with enriched member profiles, unread count, and la
 | `size` | int | 50 | Messages per page |
 
 **Response**: Paginated `ChatMessageResponse`
+
+> **Ordering**: Within each page, messages are in **chronological order** (oldest first, newest last) — ready to render top-to-bottom in a chat UI.
+> `page=0` contains the **most recent** messages. Increment `page` to load older messages.
+
 ```json
 {
   "content": [
@@ -408,6 +412,10 @@ Body: { "body": "Hey!" }
 → Returns ChatMessageResponse with room_id
 → Invalidate rooms query to see the new/updated room
 ```
+
+> **⚠️ Important**: Use this endpoint only for the **first** message to a user.
+> Once you have the `room_id` from the response, use `POST /rooms/{roomId}/messages` for all subsequent messages in that conversation.
+> Calling this endpoint with your **own** user ID as `targetUserId` will return a 400 error.
 
 ```typescript
 const msg = await sendPrivateMessage(targetUserId, 'Hey!');

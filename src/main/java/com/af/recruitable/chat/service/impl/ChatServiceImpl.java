@@ -18,6 +18,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,11 +36,32 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public ChatRoomResponse createRoom(CreateRoomRequest request, UUID userId, UUID orgId, boolean requesterIsAdmin) {
-        return switch (request.getType()) {
+        RoomType effectiveType = resolveRoomType(request);
+
+        return switch (effectiveType) {
             case PRIVATE -> getOrCreatePrivateRoom(validatePrivateTargetUser(request), userId, orgId);
             case GROUP -> createGroupRoom(request, userId, orgId);
             case PUBLIC -> createPublicRoom(request, userId, orgId, requesterIsAdmin);
         };
+    }
+
+    /**
+     * Auto-correct room type when the payload doesn't match the declared type.
+     * PRIVATE rooms are strictly 1-on-1 (exactly 1 target in memberUserIds).
+     * If PRIVATE is sent with multiple members or a name, it's actually a GROUP room.
+     */
+    private RoomType resolveRoomType(CreateRoomRequest request) {
+        if (request.getType() == RoomType.PRIVATE) {
+            int memberCount = request.getMemberUserIds() != null ? request.getMemberUserIds().size() : 0;
+            boolean hasName = request.getName() != null && !request.getName().isBlank();
+
+            if (memberCount > 1 || (memberCount != 1 && hasName)) {
+                log.info("Auto-corrected room type PRIVATE → GROUP (name={}, memberCount={})",
+                        request.getName(), memberCount);
+                return RoomType.GROUP;
+            }
+        }
+        return request.getType();
     }
 
     @Override
@@ -180,7 +203,21 @@ public class ChatServiceImpl implements ChatService {
         Page<ChatMessage> messagePage = messageRepository
                 .findByRoomIdAndDeletedFalseOrderByCreatedAtDesc(roomId.toString(), PageRequest.of(page, size));
 
-        return PageResponse.of(messagePage.map(this::toMessageResponse));
+        // Reverse: DB returns newest-first (DESC) for pagination, but chat UI
+        // needs oldest-first (ASC) within each page so newest messages appear at bottom.
+        List<ChatMessageResponse> chronological = new ArrayList<>(
+                messagePage.map(this::toMessageResponse).getContent());
+        Collections.reverse(chronological);
+
+        return PageResponse.<ChatMessageResponse>builder()
+                .content(chronological)
+                .page(messagePage.getNumber())
+                .size(messagePage.getSize())
+                .totalElements(messagePage.getTotalElements())
+                .totalPages(messagePage.getTotalPages())
+                .first(messagePage.isFirst())
+                .last(messagePage.isLast())
+                .build();
     }
 
     @Override

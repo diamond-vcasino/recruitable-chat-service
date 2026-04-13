@@ -174,7 +174,8 @@ public class ChatRestController {
 
     @GetMapping("/rooms/{roomId}/messages")
     @Operation(summary = "Get message history",
-            description = "Paginated message history for a room, ordered newest-first. " +
+            description = "Paginated message history for a room. Within each page, messages are in chronological order " +
+                    "(oldest first, newest last — ready for chat UI display). " +
                     "Use `page=0` for latest messages, increment page to load older messages.")
     @ApiResponse(responseCode = "200", description = "Paginated messages")
     @ApiResponse(responseCode = "403", description = "Not a member of this room")
@@ -222,6 +223,9 @@ public class ChatRestController {
                     Use this as a shortcut instead of calling `POST /users/{id}/rooms/private` + `POST /rooms/{id}/messages` separately.
                     
                     Returns the sent message (check `room_id` to know which room it went to).
+                    
+                    **Important**: `targetUserId` must be the *other* user's ID, not your own.
+                    Once a room exists, prefer `POST /rooms/{roomId}/messages` for subsequent messages.
                     """)
     @ApiResponse(responseCode = "201", description = "Message sent")
     @ApiResponse(responseCode = "400", description = "Cannot DM yourself or invalid payload")
@@ -230,6 +234,14 @@ public class ChatRestController {
             @Valid @RequestBody SendPrivateMessageRequest request) {
         UUID userId = SecurityUtils.getCurrentUserId();
         UUID orgId = SecurityUtils.getCurrentOrganizationId();
+
+        if (targetUserId.equals(userId)) {
+            throw new com.af.recruitable.chat.exception.ChatException(
+                    "Cannot send a private message to yourself. " +
+                    "If you are replying in an existing conversation, use POST /api/v1/chat/rooms/{roomId}/messages instead.",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+
         request.setTargetUserId(targetUserId);
         ensureSenderNamePrivate(request);
 
