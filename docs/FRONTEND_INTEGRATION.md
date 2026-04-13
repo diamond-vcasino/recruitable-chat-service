@@ -2,7 +2,10 @@
 
 > **Base URL**: `http://localhost:8082/api/v1/chat`
 > **WebSocket**: `ws://localhost:8082/ws`
-> **Auth**: All endpoints require `Authorization: Bearer <JWT>` header
+> **Auth**: All REST endpoints accept JWT via:
+> - `Authorization: Bearer <JWT>` header, **or**
+> - `rct_at` cookie (set by the main app on login), **or**
+> - `access_token` cookie (fallback)
 
 ---
 
@@ -578,12 +581,95 @@ Body: { "type": "PUBLIC", "name": "Announcements" }
 ### Connection
 
 ```typescript
-// Connect with JWT token
-connectChat(token, onConnected, onDisconnected);
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
+
+const CHAT_WS_URL = 'http://localhost:8082/ws';
+
+let stompClient: Client | null = null;
+
+export function connectChat(
+  token: string,
+  orgId: string,
+  onConnected: () => void,
+  onDisconnected: () => void,
+) {
+  stompClient = new Client({
+    // Use SockJS as transport (fallback for browsers without native WS)
+    webSocketFactory: () => new SockJS(CHAT_WS_URL),
+    
+    // Pass JWT in STOMP CONNECT frame
+    connectHeaders: {
+      Authorization: `Bearer ${token}`,
+    },
+    
+    // Reconnect on disconnect (with new token if refreshed)
+    reconnectDelay: 5000,
+
+    onConnect: () => {
+      console.log('STOMP connected');
+      onConnected();
+
+      // Subscribe to org-level events
+      stompClient?.subscribe(`/topic/org.${orgId}.rooms`, (msg) => {
+        const event = JSON.parse(msg.body);
+        // Handle ROOM_CREATED, ROOM_UPSERTED, etc. → refetch rooms
+      });
+
+      stompClient?.subscribe(`/topic/org.${orgId}.presence`, (msg) => {
+        const event = JSON.parse(msg.body);
+        // Handle USER_ONLINE / USER_OFFLINE → update online set
+      });
+    },
+
+    onDisconnect: () => {
+      console.log('STOMP disconnected');
+      onDisconnected();
+    },
+
+    onStompError: (frame) => {
+      console.error('STOMP error:', frame.headers['message']);
+    },
+  });
+
+  stompClient.activate();
+}
+
+// Subscribe to a room's messages (call when user selects a room)
+export function subscribeToRoom(orgId: string, roomId: string, onMessage: (msg: any) => void) {
+  return stompClient?.subscribe(`/topic/org.${orgId}.room.${roomId}`, (frame) => {
+    onMessage(JSON.parse(frame.body));
+  });
+}
+
+// Subscribe to typing in a room
+export function subscribeToTyping(orgId: string, roomId: string, onTyping: (evt: any) => void) {
+  return stompClient?.subscribe(`/topic/org.${orgId}.room.${roomId}.typing`, (frame) => {
+    onTyping(JSON.parse(frame.body));
+  });
+}
+
+// Send typing indicator
+export function sendTyping(roomId: string, typing: boolean) {
+  stompClient?.publish({
+    destination: '/app/chat.typing',
+    body: JSON.stringify({ room_id: roomId, typing }),
+  });
+}
+
+// Disconnect
+export function disconnectChat() {
+  stompClient?.deactivate();
+  stompClient = null;
+}
 ```
 
 **WebSocket URL**: `ws://localhost:8082/ws` (or with SockJS: `http://localhost:8082/ws`)
-**Pass token**: as query param `?token=<JWT>` or via STOMP CONNECT headers
+**Pass token** via one of these methods (in priority order):
+1. STOMP CONNECT `Authorization: Bearer <token>` header (recommended)
+2. STOMP CONNECT `token` header (plain JWT)
+3. `rct_at` cookie (auto-captured during HTTP handshake)
+4. `access_token` cookie (fallback, captured during handshake)
 
 ### STOMP Destinations
 
@@ -744,9 +830,11 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: 'http://localhost:8082/api/v1/chat',
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // Send rct_at cookie automatically
 });
 
-// Add JWT token to every request
+// Optional: add Bearer header if you have the token in memory
+// (not needed if using cookies — the rct_at cookie is sent automatically)
 api.interceptors.request.use((config) => {
   const token = tokenService.getAccessToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
