@@ -20,10 +20,13 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -101,22 +104,7 @@ public class OrgMemberService {
 
             List<OrgMemberResponse> members = profiles.stream()
                     .filter(Objects::nonNull)
-                    .map(profile -> {
-                        UUID memberId = profile.getUserId();
-                        String fullName = profile.resolveDisplayName();
-                        String email = profile.getEmail() == null ? "" : profile.getEmail();
-
-                        return OrgMemberResponse.builder()
-                                .userId(memberId)
-                                .fullName(fullName)
-                                .email(email)
-                                .avatarUrl(profile.resolveAvatarUrl())
-                                .role(profile.getRole())
-                                .department(profile.getDepartment())
-                                .status(profile.getStatus())
-                                .isCurrentUser(memberId != null && memberId.equals(currentUserId))
-                                .build();
-                    })
+                    .map(profile -> toOrgMemberResponse(profile, currentUserId))
                     .filter(member -> normalizedSearch.isBlank() ||
                             member.getFullName().toLowerCase(Locale.ROOT).contains(normalizedSearch) ||
                             member.getEmail().toLowerCase(Locale.ROOT).contains(normalizedSearch))
@@ -140,6 +128,41 @@ public class OrgMemberService {
         }
     }
 
+    public List<OrgMemberResponse> listOrgMembersByIds(Set<UUID> userIds, String jwtToken, UUID currentUserId) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> unresolved = new HashSet<>(userIds);
+        List<OrgMemberResponse> onlineMembers = new ArrayList<>();
+
+        int page = 0;
+        int size = Math.min(Math.max(userIds.size() * 2, 100), 500);
+
+        while (!unresolved.isEmpty()) {
+            PageResponse<OrgMemberResponse> memberPage = listOrgMembers(null, page, size, jwtToken, currentUserId);
+            if (memberPage.getContent() == null || memberPage.getContent().isEmpty()) {
+                break;
+            }
+
+            for (OrgMemberResponse member : memberPage.getContent()) {
+                if (member.getUserId() != null && unresolved.contains(member.getUserId())) {
+                    onlineMembers.add(member);
+                    unresolved.remove(member.getUserId());
+                }
+            }
+
+            if (memberPage.isLast()) {
+                break;
+            }
+            page++;
+        }
+
+        return onlineMembers.stream()
+                .sorted(Comparator.comparing(OrgMemberResponse::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
     private PageResponse<OrgMemberResponse> emptyPage(int page, int size) {
         return PageResponse.<OrgMemberResponse>builder()
                 .content(List.of())
@@ -149,6 +172,23 @@ public class OrgMemberService {
                 .totalPages(0)
                 .first(page == 0)
                 .last(true)
+                .build();
+    }
+
+    private OrgMemberResponse toOrgMemberResponse(ProfileDto profile, UUID currentUserId) {
+        UUID memberId = profile.getUserId();
+        String fullName = profile.resolveDisplayName();
+        String email = profile.getEmail() == null ? "" : profile.getEmail();
+
+        return OrgMemberResponse.builder()
+                .userId(memberId)
+                .fullName(fullName)
+                .email(email)
+                .avatarUrl(profile.resolveAvatarUrl())
+                .role(profile.getRole())
+                .department(profile.getDepartment())
+                .status(profile.getStatus())
+                .isCurrentUser(memberId != null && memberId.equals(currentUserId))
                 .build();
     }
 

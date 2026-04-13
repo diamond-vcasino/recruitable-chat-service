@@ -29,6 +29,8 @@ public class ChatMessage {
 
     private String senderId;
 
+    private String senderName;
+
     private MessageType type;
 
     private String body;
