@@ -72,20 +72,20 @@ Why STOMP:
 - clear separation between send destinations (`/app/*`) and subscribe destinations (`/topic/*`)
 - works well with SockJS fallback
 
-### PostgreSQL
+### MongoDB
 
 Used for durable chat data:
 
-- rooms
-- membership
+- rooms (with embedded membership)
 - messages
 - read state metadata
 
-Why relational DB:
+Why document DB:
 
-- strong consistency for membership and access rules
-- simple modeling of room/member/message relations
-- robust querying and indexing
+- flexible schema for evolving chat features
+- embedded documents for room members (no JOINs needed)
+- natural fit for message collections with compound indexes
+- simple horizontal scaling
 
 ### Redis
 
@@ -108,14 +108,25 @@ Why:
 - avoids storing large blobs in relational DB
 - scalable and CDN-friendly
 
-### Optional RabbitMQ STOMP relay
+### RabbitMQ (AMQP event bus)
 
-Used when scaling across multiple app instances.
+Used for broadcasting chat events across all application instances.
+
+Every REST/WebSocket write publishes to a RabbitMQ topic exchange (`chat.exchange`).
+Each instance creates its own anonymous queue and relays events to its locally-connected
+WebSocket clients via `SimpMessagingTemplate`.
 
 Why:
 
-- decouples pub/sub from in-memory broker
-- enables cross-instance event fan-out
+- enables horizontal scaling (multiple instances)
+- decouples event production from WebSocket delivery
+- guaranteed delivery to all connected clients across all nodes
+
+### Optional: RabbitMQ STOMP relay
+
+Can be enabled (`app.websocket.broker-relay-enabled: true`) to replace the in-memory
+STOMP broker with a RabbitMQ STOMP plugin relay. Currently unused — the AMQP fan-out
+pattern above is the primary cross-instance mechanism.
 
 ---
 
@@ -152,49 +163,49 @@ Why:
 
 ## 4) Data Model and Domain Design
 
-Schema is managed by Flyway in `af_recruitable_chat`.
+Schema is managed as MongoDB collections with Spring Data MongoDB annotations.
 
-### `chat_rooms`
+### `chat_rooms` (collection)
 
-Represents conversation containers.
+Represents conversation containers with embedded membership.
 
 Key fields:
 
-- `organization_id`: multi-tenant partition key
+- `organizationId`: multi-tenant partition key
 - `type`: `PRIVATE`, `GROUP`, `PUBLIC`
 - `name/description`: mostly for group/public rooms
+- `members`: embedded array of `ChatRoomMember` documents
 
-### `chat_room_members`
+### `ChatRoomMember` (embedded document within `chat_rooms`)
 
 Represents user-room membership and read state.
 
 Key fields:
 
-- `user_id`
+- `userId`
 - `role`: `OWNER`, `ADMIN`, `MEMBER`
-- `last_read_at`: per-user room read marker
+- `lastReadAt`: per-user room read marker
+- `joinedAt`: when the user was added
 
-Uniqueness:
-
-- `uq_room_user` prevents duplicate membership row
-
-### `chat_messages`
+### `chat_messages` (collection)
 
 Represents chat message records.
 
 Key fields:
 
-- `sender_id`
+- `roomId` + `organizationId` (denormalized for access-control)
+- `senderId`, `senderName`
 - `type`: `TEXT`, `FILE`, `SYSTEM`
-- file metadata (`file_url`, `file_name`, etc.)
+- file metadata (`fileUrl`, `fileName`, etc.)
 - soft-delete flags (`deleted`)
-- edit metadata (`edited`, `edited_at`)
+- edit metadata (`edited`, `editedAt`)
+- `createdAt` (compound index with `roomId` for efficient pagination)
 
 ### Why this model?
 
-- Clear separation of room, membership, and message concerns
-- Supports room-based authorization at query time
-- Works for both direct and group/public modes
+- Embedded membership eliminates JOIN queries for room access checks
+- Compound indexes enable efficient room-scoped message pagination
+- Document model naturally supports varying message types (TEXT/FILE/SYSTEM)
 
 ---
 
@@ -234,8 +245,10 @@ For add/remove member operations:
 
 `JwtAuthenticationFilter`:
 
-- reads `Authorization: Bearer <token>`
+- reads `Authorization: Bearer <token>` header
+- falls back to `rct_at` or `access_token` cookies
 - validates signature, issuer, audience, expiry
+- checks token revocation via Redis blacklist
 - extracts claims into `JwtAuthenticationToken`
 - stores auth in `SecurityContext`
 
@@ -398,17 +411,18 @@ Why Redis here:
 
 Important config groups in `application.yml`:
 
-- datasource + JPA + Flyway
-- Redis
-- RabbitMQ relay toggle
-- JWT secret/issuer/audience
-- S3 credentials and endpoint
+- MongoDB connection (URI, database name, auto-index)
+- Redis (presence, typing, token revocation)
+- RabbitMQ (AMQP event bus for cross-instance fan-out)
+- JWT secret/issuer/audience (must match main api-backend)
+- S3 credentials and endpoint (file uploads)
+- CORS settings (allowAllOrigins toggle)
 
 ## Deployment prerequisites
 
-- PostgreSQL
+- MongoDB 7.0+
 - Redis
-- optional RabbitMQ for multi-instance realtime
+- RabbitMQ (AMQP for event fan-out across instances)
 - S3-compatible bucket
 
 ---

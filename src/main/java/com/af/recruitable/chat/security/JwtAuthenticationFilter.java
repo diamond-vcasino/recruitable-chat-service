@@ -3,6 +3,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -70,10 +71,43 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         filterChain.doFilter(request, response);
     }
+    /**
+     * Extract JWT from (in priority order):
+     * 1. Authorization: Bearer header
+     * 2. rct_at cookie (primary frontend cookie)
+     * 3. access_token cookie (fallback)
+     */
     private String extractToken(HttpServletRequest request) {
+        // 1. Authorization header
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
-            return header.substring(7);
+            String token = header.substring(7).trim();
+            if (!token.isEmpty()) {
+                return token;
+            }
+        }
+
+        // 2. rct_at cookie (same name used by WebSocket handshake interceptor)
+        String cookieToken = findCookieValue(request.getCookies(), "rct_at");
+        if (cookieToken != null) {
+            return cookieToken;
+        }
+
+        // 3. access_token cookie (fallback)
+        return findCookieValue(request.getCookies(), "access_token");
+    }
+
+    private String findCookieValue(Cookie[] cookies, String name) {
+        if (cookies == null) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (name.equals(cookie.getName())) {
+                String value = cookie.getValue();
+                if (value != null && !value.isBlank()) {
+                    return value.trim();
+                }
+            }
         }
         return null;
     }

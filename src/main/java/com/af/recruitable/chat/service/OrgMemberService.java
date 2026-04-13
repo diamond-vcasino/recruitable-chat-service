@@ -105,9 +105,9 @@ public class OrgMemberService {
             List<OrgMemberResponse> members = profiles.stream()
                     .filter(Objects::nonNull)
                     .map(profile -> toOrgMemberResponse(profile, currentUserId))
-                    .filter(member -> normalizedSearch.isBlank() ||
-                            member.getFullName().toLowerCase(Locale.ROOT).contains(normalizedSearch) ||
-                            member.getEmail().toLowerCase(Locale.ROOT).contains(normalizedSearch))
+                    .filter(member -> normalizedSearch.isBlank()
+                            || (member.getFullName() != null && member.getFullName().toLowerCase(Locale.ROOT).contains(normalizedSearch))
+                            || (member.getEmail() != null && member.getEmail().toLowerCase(Locale.ROOT).contains(normalizedSearch)))
                     .toList();
 
             return PageResponse.<OrgMemberResponse>builder()
@@ -159,7 +159,9 @@ public class OrgMemberService {
         }
 
         return onlineMembers.stream()
-                .sorted(Comparator.comparing(OrgMemberResponse::getFullName, String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(
+                        m -> m.getFullName() != null ? m.getFullName() : "",
+                        String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
